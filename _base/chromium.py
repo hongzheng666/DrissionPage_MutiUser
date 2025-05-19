@@ -33,6 +33,21 @@ __ERROR__ = 'error'
 
 
 class Chromium(object):
+    '''
+    ### 版本问题
+    > 参考操作,点击右上角谷歌用户,然后添加Chrome个人资料。这个时候 user_data_path下会多一个"Profile 1"这个就是user.如果要debug此用户,端口和user_data_path任意启动debug得端口一致
+    > 当然这里存在这么一个小问题，如果对应得user_data_path存在任意一个browserContextId,则后续命令行就算添加 ip port也会不生效。
+    
+        1. 端口存在的情况下 如果user改变了,不会执行命令行启动浏览器。
+        2. 就算exits还是需要执行命令行启动浏览器
+    
+    ### 说明
+        1. 端口debug端口被占用,其实并不重要  如果同一个user_data_dir,启动不同得user,端口设置是不会生效得，继续执行命令行，会新建一个多用户窗口
+    ### 当前解决办法
+        1. 只是在connect_browser是，不管is_exits,都执行命令行 TODO 此处可以通过管理 在 user_data_path和user一样得情况下不执行命令行
+    ### 备注
+        1. 目前来看 new_tab(xxxxx,new_context=True) 启动得窗口 不能像正常用户一样操作
+    '''
     _BROWSERS = {}
     _lock = Lock()
 

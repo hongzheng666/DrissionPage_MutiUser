@@ -27,9 +27,10 @@ def connect_browser(option):
 
     ip, port = address.split(':')
     using = port_is_using(ip, port)
+    _exits=False
     if ip != '127.0.0.1' or using or option.is_existing_only:
         if test_connect(ip, port):
-            return True
+            _exits=True
         elif ip != '127.0.0.1':
             raise BrowserConnectError(ADDRESS=address)
         elif using:
@@ -55,7 +56,7 @@ def connect_browser(option):
 
     if not test_connect(ip, port):
         raise BrowserConnectError(ADDRESS=address, TIP=_S._lang.BROWSER_CONNECT_ERR_INFO)
-    return False
+    return _exits
 
 
 def get_launch_args(opt):
