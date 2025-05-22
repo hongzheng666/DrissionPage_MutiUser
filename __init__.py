@@ -20,6 +20,7 @@
 版权持有人不对DrissionPage可能存在的缺陷导致的任何损失负任何责任。
 """
 from ._base.chromium import Chromium
+from ._base.chromiumbrowsercontext import ChromiumBrowserContext
 from ._configs.chromium_options import ChromiumOptions
 from ._configs.session_options import SessionOptions
 from ._pages.chromium_page import ChromiumPage

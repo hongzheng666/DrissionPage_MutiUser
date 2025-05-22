@@ -6,6 +6,7 @@
 @Copyright: (c) 2020 by g1879, Inc. All Rights Reserved.
 """
 from ._base.chromium import Chromium
+from ._base.chromiumbrowsercontext import ChromiumBrowserContext
 from ._configs.chromium_options import ChromiumOptions
 from ._configs.session_options import SessionOptions
 from ._pages.chromium_page import ChromiumPage
@@ -14,4 +15,5 @@ from ._pages.web_page import WebPage
 from .version import __version__
 
 
-__all__ = ['WebPage', 'ChromiumPage', 'Chromium', 'ChromiumOptions', 'SessionOptions', 'SessionPage', '__version__']
+
+__all__ = ['WebPage', 'ChromiumPage', 'Chromium','ChromiumBrowserContext', 'ChromiumOptions', 'SessionOptions', 'SessionPage', '__version__']
