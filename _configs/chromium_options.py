@@ -5,6 +5,7 @@
 @Website  : https://DrissionPage.cn
 @Copyright: (c) 2020 by g1879, Inc. All Rights Reserved.
 """
+import hashlib
 from pathlib import Path
 from re import search
 
@@ -155,6 +156,13 @@ class ChromiumOptions(object):
     @property
     def is_headless(self):
         return self._is_headless
+
+    @property
+    def context_uid(self):
+        return hashlib.md5(
+          '###|###'.join(  [self._user_data_path,self._user]).encode('utf8')
+        ).hexdigest()
+
 
     def set_retry(self, times=None, interval=None):
         if times is not None:
