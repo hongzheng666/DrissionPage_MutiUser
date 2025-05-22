@@ -74,10 +74,13 @@ class ChromiumBrowserContext(object):
 
             if _t:
                 with cls._lock:
-                    r_init = cls._PORT_BROSERID_MAP[port]
-                    while (not hasattr(r_init, '_driver')) :
-                                    sleep(.05)
-                    lastcontextids=set(r_init.context_ids)
+                    if port in cls._PORT_BROSERID_MAP:
+                        r_init = cls._PORT_BROSERID_MAP[port]
+                        while (not hasattr(r_init, '_driver')) :
+                                        sleep(.05)
+                        lastcontextids=set(r_init.context_ids)
+                    else:
+                        _t=False
         is_headless, browser_id, is_exists = run_browser(opt)
         if _t:
             newcontextids=set(r_init.context_ids)
