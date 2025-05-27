@@ -13,7 +13,7 @@ from time import perf_counter, sleep
 from requests import Session
 from requests import adapters
 from websocket import (WebSocketTimeoutException, WebSocketConnectionClosedException, create_connection,
-                       WebSocketException, WebSocketBadStatusException)
+                       WebSocketException, WebSocketBadStatusException,WebSocket)
 
 from .._functions.settings import Settings as _S
 from ..errors import PageDisconnectedError, BrowserConnectError
@@ -59,6 +59,7 @@ class Driver(object):
         self.method_results[ws_id] = Queue()
         try:
             self._ws.send(message_json)
+            _ws:WebSocket=self._ws 
             if timeout == 0:
                 self.method_results.pop(ws_id, None)
                 return {'id': ws_id, 'result': {}}

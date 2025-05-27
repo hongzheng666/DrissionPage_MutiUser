@@ -12,6 +12,7 @@ from threading import Lock
 from time import sleep, perf_counter
 
 from requests import Session
+import requests
 from websocket import WebSocketBadStatusException
 
 from .driver import  Driver
@@ -51,13 +52,14 @@ class ChromiumBrowserContext(object):
         3. 上述单例 只要不通过new_tab(xxxx,new_context=True)去调用逻辑上browserContext一致的
     ### 备注
         1. 目前来看 new_tab(xxxxx,new_context=True) 启动得窗口 不能像正常用户一样操作
+        2. 懒得改目前的问题是 需要把user_data_dir 和user在浏览器的生命周期内写入本地文件。。。太麻烦了
     '''
     _BROWSERS = {}  
     _BROWSER_INIT_SUCCESS={}
     _REGISTER_BROWSERCONTEXT={}
     _PORT_BROSERID_MAP={}
     _lock = Lock()
-
+    
     def __new__(cls, addr_or_opts=None, session_options=None):
         opt = handle_options(addr_or_opts)
         ip,port=opt.address.split(':')
@@ -67,29 +69,38 @@ class ChromiumBrowserContext(object):
         context_uid=opt.context_uid
         if context_uid in cls._BROWSERS:
             r = cls._BROWSERS[context_uid]
-        lastcontextids=None
+        lasttabids=None
         _t=False
         if _in_use:
             _t=test_connect(ip,port)
-
+            
             if _t:
                 with cls._lock:
                     if port in cls._PORT_BROSERID_MAP:
                         r_init = cls._PORT_BROSERID_MAP[port]
                         while (not hasattr(r_init, '_driver')) :
                                         sleep(.05)
-                        lastcontextids=set(r_init.context_ids)
+                        lasttabids=set(r_init.tab_ids1)
                     else:
-                        _t=False
+                        r_init=object.__new__(cls)
+                        res = requests.get(f'http://{opt.address}/json/version', headers={'Connection': 'close'})
+
+                        browser_id = res.json()['webSocketDebuggerUrl'].split('/')[-1]
+                        r_init._driver=BrowserContextDriver(
+                            browser_id,context_id='default',tab_type='browser',address=opt.address,owner=r_init
+                        )
+                        lasttabids=set(r_init.tab_ids1)
+                        
         is_headless, browser_id, is_exists = run_browser(opt)
         if _t:
-            newcontextids=set(r_init.context_ids)
-            while newcontextids==lastcontextids:
-                newcontextids=set(r_init.context_ids)
+            newtabids=set(r_init.tab_ids1)
+            while lasttabids==newtabids:
+                newtabids=set(r_init.tab_ids1)
                 sleep(0.05)
-            _info=r_init._run_cdp('Target.getTargetInfo',targetId=r_init.latest_tab.tab_id)['targetInfo']
-            _browsercontextid=(newcontextids-lastcontextids).pop()
-            print('_info',_info)
+            _tabid=(newtabids-lasttabids).pop()
+            _info=r_init._run_cdp('Target.getTargetInfo',targetId=_tabid)['targetInfo']
+            _browsercontextid=_info.get('browserContextId')
+            print('_browsercontextid',_browsercontextid)
             r._newest_tab_id=_info.get('targetId')
             if _browsercontextid and _browsercontextid not in ChromiumBrowserContext._REGISTER_BROWSERCONTEXT:
                 r.browserContextId=_browsercontextid
@@ -99,7 +110,9 @@ class ChromiumBrowserContext(object):
                 r = cls._BROWSERS[context_uid]
                 while (not hasattr(r, '_driver')) :
                                     sleep(.05)
+              
                 return r
+        
         r._is_headless = is_headless
         r._is_exists = is_exists
         r.id = browser_id
@@ -107,7 +120,7 @@ class ChromiumBrowserContext(object):
         cls._BROWSERS[context_uid] = r  
         if port not in cls._PORT_BROSERID_MAP:
             cls._PORT_BROSERID_MAP[port]=r
-        
+
         return r
 
     def __init__(self, addr_or_opts=None, session_options=None):
@@ -138,13 +151,13 @@ class ChromiumBrowserContext(object):
         self._driver = BrowserContextDriver(self.id,'default'  if not hasattr(self,'browserContextId') else self.browserContextId, 'browser', self.address, self)
         if not hasattr(self,'browserContextId'):
             _info=self._run_cdp('Target.getTargetInfo',targetId=self.latest_tab.tab_id)['targetInfo']
-            print('_info1',_info)
             _browsercontextid=_info.get('browserContextId')
             self._newest_tab_id=_info.get('targetId')
             if _browsercontextid and _browsercontextid not in ChromiumBrowserContext._REGISTER_BROWSERCONTEXT:
                 self.browserContextId=_browsercontextid
                 self._driver = BrowserContextDriver(self.id,'default'  if not hasattr(self,'browserContextId') else self.browserContextId, 'browser', self.address, self)
                 ChromiumBrowserContext._REGISTER_BROWSERCONTEXT[self.browserContextId]=True
+                ChromiumBrowserContext._BROWSERS[self.browserContextId]=self
         if ((not self._chromium_options._ua_set and self._is_headless != self._chromium_options.is_headless)
                 or (self._is_exists and self._chromium_options._new_env)):
             self.quit(3, True)
@@ -185,6 +198,8 @@ class ChromiumBrowserContext(object):
         self._dl_mgr = DownloadManager(self)
         self._session_options = session_options
         ChromiumBrowserContext._BROWSER_INIT_SUCCESS[self.id]=True
+
+        
 
     @property
     def user_data_path(self):
@@ -243,10 +258,25 @@ class ChromiumBrowserContext(object):
     def context_ids(self):
         j = self._run_cdp('Target.getTargets')['targetInfos']
         return list(set([i['browserContextId'] for i in j if i['type'] in ('page', 'webview') and not i['url'].startswith('devtools://')]))
-   
+    @property
+    def tab_ids1(self):
+        j = self._run_cdp('Target.getTargets')['targetInfos'] 
+        return list(set([i['targetId'] for i in j if i['type'] in ('page', 'webview') and not i['url'].startswith('devtools://')]))
+    @property
+    def tab_ids_in_context(self):
+        if not self.browserContextId:
+            return []
+        j = self._run_cdp('Target.getTargets')['targetInfos'] 
+        return list(set([i['targetId'] for i in j if i['type'] in ('page', 'webview') and not i['url'].startswith('devtools://') and i['browserContextId']==self.browserContextId  ]))
     @property
     def latest_tab(self):
         return self._get_tab(id_or_num=self.tab_ids[0], as_id=not _S.singleton_tab_obj)
+    
+    @property
+    def latest_tab_in_context(self):
+        if not self.tab_ids_in_context:
+            return self.latest_tab
+        return self._get_tab(id_or_num=self.tab_ids_in_context[0], as_id=not _S.singleton_tab_obj)
 
     def cookies(self, all_info=False):
         cks = self._run_cdp(f'Storage.getCookies')['cookies']
@@ -378,9 +408,8 @@ class ChromiumBrowserContext(object):
         tab = None
         if new_context:
             tab = self._run_cdp('Target.createBrowserContext')['browserContextId']
-
         kwargs = {'url': '','browserContextId':self.browserContextId}
-        _s=self._run_cdp('Target.activateTarget',targetId=self._newest_tab_id)
+        _s=self._run_cdp('Target.activateTarget',targetId=self.latest_tab_in_context.tab_id)
         if new_window:
             kwargs['newWindow'] = True
         if background:
@@ -392,10 +421,8 @@ class ChromiumBrowserContext(object):
             return _new_tab_by_js(self, url, tab_type, new_window)
         else:
             try:
-                print(kwargs)
                 tab = self._run_cdp('Target.createTarget', **kwargs)['targetId']
             except CDPError as e:
-                print(str(e))
                 return _new_tab_by_js(self, url, tab_type, new_window)
 
         while self.states.is_alive:
@@ -437,7 +464,12 @@ class ChromiumBrowserContext(object):
 
     def _get_tabs(self, title=None, url=None, tab_type='page', mix=True, as_id=False):
         tabs = self._driver.get(f'http://{self.address}/json').json()  # 不要改用cdp
-
+        tabs_=self._run_cdp(
+            'Target.getTargets'
+        )['targetInfos']
+        tabs=[
+          {**x,**[y for y in tabs_ if y['targetId']==x['id']][0] }   for x in tabs
+        ]
         if isinstance(tab_type, str):
             tab_type = {tab_type}
         elif isinstance(tab_type, (list, tuple, set)):
@@ -448,7 +480,9 @@ class ChromiumBrowserContext(object):
 
         tabs = [i for i in tabs if ((title is None or title in i['title']) and (url is None or url in i['url'])
                                     and (tab_type is None or i['type'] in tab_type)
-                                    and i['title'] != 'chrome-extension://neajdppkdcdipfabeoofebfddakdcjhd/audio.html')]
+                                    and i['title'] != 'chrome-extension://neajdppkdcdipfabeoofebfddakdcjhd/audio.html')
+                                    and i['browserContextId']==self.browserContextId
+                                    ]
         if as_id:
             return [tab['id'] for tab in tabs]
         with self._lock:
@@ -477,10 +511,7 @@ class ChromiumBrowserContext(object):
             try:
                 tab_id = kwargs['targetInfo']['targetId']
                 context_id=kwargs['targetInfo']['browserContextId']
-                print("kwargs['targetInfo']",kwargs['targetInfo'])
-                print('----',context_id,'-----b',self.browserContextId)
                 if context_id==self.browserContextId:
-                    print('-----get it ------')
                     self._frames[tab_id] = tab_id
                     d = Driver(tab_id, 'page', self.address)
                     self._relation[tab_id] = kwargs['targetInfo'].get('openerId', None)
@@ -517,8 +548,17 @@ class ChromiumBrowserContext(object):
                     except (PermissionError, FileNotFoundError, OSError):
                         pass
                     sleep(.03)
-
-
+    def close_empty_tabs(self):
+        _=self._run_cdp("Target.getTargets")['targetInfos']
+        _=[x for x in _ if x['browserContextId']==self.browserContextId and x['type']=='page']
+        if len(_)==0:
+            return
+        _a=len(_)
+        _toclose=[x for x in _ if x['url'].startswith('chrome://newtab') and x['browserContextId']==self.browserContextId]
+        if _a==len(_toclose):
+            _toclose=_toclose[1:]
+        for x in _toclose:
+            self._run_cdp("Target.closeTarget",targetId=x['targetId'])
 def handle_options(addr_or_opts):
     """设置浏览器启动属性
     :param addr_or_opts: 'ip:port'、ChromiumOptions、Driver
