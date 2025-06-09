@@ -468,7 +468,7 @@ class ChromiumBrowserContext(object):
             'Target.getTargets'
         )['targetInfos']
         tabs=[
-          {**x,**[y for y in tabs_ if y['targetId']==x['id']][0] }   for x in tabs
+          {**x,**_temptabs[0] }   for x in tabs if (_temptabs:=[y for y in tabs_ if y['targetId']==x['id']])
         ]
         if isinstance(tab_type, str):
             tab_type = {tab_type}
