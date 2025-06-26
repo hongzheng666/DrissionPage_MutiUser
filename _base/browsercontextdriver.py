@@ -61,6 +61,7 @@ class Driver(object):
         self.method_results[ws_id] = Queue()
         try:
             self._ws.send(message_json)
+            #print(self._websocket_url ,'---',message_json)
             if timeout == 0:
                 self.method_results.pop(ws_id, None)
                 return {'id': ws_id, 'result': {}}
@@ -94,6 +95,7 @@ class Driver(object):
                 # self._ws.settimeout(1)
                 msg_json = self._ws.recv()
                 msg = loads(msg_json)
+                #print(self._websocket_url ,'---',msg_json)
             except WebSocketTimeoutException:
                 continue
             except (WebSocketException, OSError, WebSocketConnectionClosedException, JSONDecodeError):
@@ -151,7 +153,12 @@ class Driver(object):
         :return: 执行结果
         """
         if not self.is_running:
-            return {'error': 'connection disconnected', 'type': 'connection_error'}
+            trycoun=0
+            while not self.is_running and trycoun<3:
+                trycoun+=1
+                self.start()
+            if not self.is_running:
+                return {'error': 'connection disconnected', 'type': 'connection_error'}
 
         timeout = kwargs.pop('_timeout', _S.cdp_timeout)
         result = self._send({'method': _method, 'params': kwargs}, timeout=timeout)

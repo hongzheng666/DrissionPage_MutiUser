@@ -1194,6 +1194,7 @@ def run_js(page_or_ele, script, as_expr, timeout, args=None):
         is_page = False
         page = page_or_ele.owner
         obj_id = page_or_ele._obj_id
+        
     else:
         is_page = True
         page = page_or_ele
@@ -1224,11 +1225,14 @@ def run_js(page_or_ele, script, as_expr, timeout, args=None):
 
         else:
             args = args or ()
+
             if not is_js_func(script):
                 script = f'function(){{{script}}}'
+
             res = page._run_cdp('Runtime.callFunctionOn', functionDeclaration=script, objectId=obj_id,
-                                arguments=[convert_argument(arg) for arg in args], returnByValue=False,
+                                arguments=[convert_argument(arg) for arg in args], returnByValue=True,
                                 awaitPromise=True, userGesture=True, _timeout=timeout, _ignore=AlertExistsError)
+
     except TimeoutError:
         raise TimeoutError(_S._lang.join(_S._lang.TIMEOUT_, _S._lang.RUN_JS, timeout))
     except ContextLostError:
@@ -1244,7 +1248,7 @@ def run_js(page_or_ele, script, as_expr, timeout, args=None):
     try:
         return parse_js_result(page, page_or_ele, res.get('result'), end_time)
     except Exception:
-        from DrissionPage import __version__
+        from version import __version__
         raise RuntimeError(_S._lang.join(_S._lang.JS_RESULT_ERR, INFO=res, JS=script, TIP=_S._lang.FEEDBACK))
 
 
