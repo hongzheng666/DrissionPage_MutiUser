@@ -14,6 +14,7 @@ import time
 
 from requests import Session
 import requests
+import requests
 from websocket import WebSocketBadStatusException
 
 from .driver import  Driver
@@ -54,12 +55,14 @@ class ChromiumBrowserContext(object):
     ### 备注
         1. 目前来看 new_tab(xxxxx,new_context=True) 启动得窗口 不能像正常用户一样操作
         2. 懒得改目前的问题是 需要把user_data_dir 和user在浏览器的生命周期内写入本地文件。。。太麻烦了
+        2. 懒得改目前的问题是 需要把user_data_dir 和user在浏览器的生命周期内写入本地文件。。。太麻烦了
     '''
     _BROWSERS = {}  
     _BROWSER_INIT_SUCCESS={}
     _REGISTER_BROWSERCONTEXT={}
     _PORT_BROSERID_MAP={}
     _lock = Lock()
+    
     
     def __new__(cls, addr_or_opts=None, session_options=None):
         opt = handle_options(addr_or_opts)
@@ -71,9 +74,11 @@ class ChromiumBrowserContext(object):
         if context_uid in cls._BROWSERS:
             r = cls._BROWSERS[context_uid]
         lasttabids=None
+        lasttabids=None
         _t=False
         if _in_use:
             _t=test_connect(ip,port)
+            
             
             if _t:
                 with cls._lock:
@@ -114,7 +119,9 @@ class ChromiumBrowserContext(object):
                 while (not hasattr(r, '_driver')) :
                                     sleep(.05)
               
+              
                 return r
+        
         
         r._is_headless = is_headless
         r._is_exists = is_exists
@@ -123,6 +130,7 @@ class ChromiumBrowserContext(object):
         cls._BROWSERS[context_uid] = r  
         if port not in cls._PORT_BROSERID_MAP:
             cls._PORT_BROSERID_MAP[port]=r
+
 
         return r
 
@@ -160,6 +168,7 @@ class ChromiumBrowserContext(object):
                 self.browserContextId=_browsercontextid
                 self._driver = BrowserContextDriver(self.id,'default'  if not hasattr(self,'browserContextId') else self.browserContextId, 'browser', self.address, self)
                 ChromiumBrowserContext._REGISTER_BROWSERCONTEXT[self.browserContextId]=True
+                ChromiumBrowserContext._BROWSERS[self.browserContextId]=self
                 ChromiumBrowserContext._BROWSERS[self.browserContextId]=self
         if ((not self._chromium_options._ua_set and self._is_headless != self._chromium_options.is_headless)
                 or (self._is_exists and self._chromium_options._new_env)):
@@ -201,6 +210,8 @@ class ChromiumBrowserContext(object):
         self._dl_mgr = DownloadManager(self)
         self._session_options = session_options
         ChromiumBrowserContext._BROWSER_INIT_SUCCESS[self.id]=True
+
+        
 
         
 
@@ -274,6 +285,12 @@ class ChromiumBrowserContext(object):
     @property
     def latest_tab(self):
         return self._get_tab(id_or_num=self.tab_ids[0], as_id=not _S.singleton_tab_obj)
+    
+    @property
+    def latest_tab_in_context(self):
+        if not self.tab_ids_in_context:
+            return self.latest_tab
+        return self._get_tab(id_or_num=self.tab_ids_in_context[0], as_id=not _S.singleton_tab_obj)
     
     @property
     def latest_tab_in_context(self):
@@ -495,6 +512,9 @@ class ChromiumBrowserContext(object):
 
         tabs = [i for i in tabs if ((title is None or title in i['title']) and (url is None or url in i['url'])
                                     and (tab_type is None or i['type'] in tab_type)
+                                    and i['title'] != 'chrome-extension://neajdppkdcdipfabeoofebfddakdcjhd/audio.html')
+                                    and i['browserContextId']==self.browserContextId
+                                    ]
                                     and i['title'] != 'chrome-extension://neajdppkdcdipfabeoofebfddakdcjhd/audio.html')
                                     and i['browserContextId']==self.browserContextId
                                     ]
