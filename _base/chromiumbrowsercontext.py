@@ -515,9 +515,6 @@ class ChromiumBrowserContext(object):
                                     and i['title'] != 'chrome-extension://neajdppkdcdipfabeoofebfddakdcjhd/audio.html')
                                     and i['browserContextId']==self.browserContextId
                                     ]
-                                    and i['title'] != 'chrome-extension://neajdppkdcdipfabeoofebfddakdcjhd/audio.html')
-                                    and i['browserContextId']==self.browserContextId
-                                    ]
         if as_id:
             return [tab['id'] for tab in tabs]
         with self._lock:
